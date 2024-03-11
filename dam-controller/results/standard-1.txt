@@ -1,0 +1,123 @@
+		     \||||||||||||||||||/
+		   --- Welcome to Maude ---
+		     /||||||||||||||||||\
+	     Maude alpha136 built: Jul 23 2021 13:33:57
+	     Copyright 1997-2021 SRI International
+		   Mon Mar 11 20:44:12 2024
+==========================================
+reduce in EXECUTE-EXAMPLE : narrowing(upModule('DAM-CONTROLLER, false), upTerm(
+    {SWS:Spillways ; V:Real ; T:Real ; B:Bool}), '=>*, upTerm(St:DamState),
+    false, false, false, false, empty, 'true.Boolean, unbounded, 2) .
+rewrites: 5194 in 56ms cpu (57ms real) (92750 rewrites/second)
+result SolutionList: {'`{_;_;_;_`}['$2:Spillways,'$4:Real,'$3:Real,'$1:Bool],
+  'B:Bool <- '$1:Bool ; 
+  'SWS:Spillways <- '$2:Spillways ; 
+  'T:Real <- '$3:Real ; 
+  'V:Real <- '$4:Real,
+  '$1:Bool <- '%4:Bool ; 
+  '$2:Spillways <- '%1:Spillways ; 
+  '$3:Real <- '%3:Real ; 
+  '$4:Real <- '%2:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['%1:Spillways,'%2:Real,'%3:Real,'%4:Bool],(
+    empty).EmptyCommaList,'true.Boolean} {'`{_;_;_;_`}['$1:Spillways,'$2:Real,
+    '$3:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '$1:Spillways ; 
+  'T:Real <- '$3:Real ; 
+  'V:Real <- '$2:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:Real <- '@2:Real ; 
+  '$3:Real <- '@3:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['@1:Spillways,'@2:Real,'@3:Real,'false.Bool],(
+    empty).EmptyCommaList,'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,
+    '`[_`,_`]['$2:SpillwayId,'open1.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'close.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'open1.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'close.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open1.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'close.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open2.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open1.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'open2.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open1.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open2.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'open1.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open3.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open2.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'open3.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open2.Aperture]],'$3:Real,'$4:Real,'false.Bool],
+  'B:Bool <- 'true.Bool ; 
+  'SWS:Spillways <- '__['$1:Spillways,'`[_`,_`]['$2:SpillwayId,
+    'open3.Aperture]] ; 
+  'T:Real <- '$4:Real ; 
+  'V:Real <- '$3:Real,
+  '$1:Spillways <- '@1:Spillways ; 
+  '$2:SpillwayId <- '@2:SpillwayId ; 
+  '$3:Real <- '@3:Real ; 
+  '$4:Real <- '@4:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['__['@1:Spillways,'`[_`,_`]['@2:SpillwayId,
+    'open2.Aperture]],'@3:Real,'@4:Real,'false.Bool],(empty).EmptyCommaList,
+    'true.Boolean} {'`{_;_;_;_`}['empty.Spillways,'$2:Real,'$3:Real,
+    'true.Bool],
+  'B:Bool <- 'false.Bool ; 
+  'SWS:Spillways <- 'empty.Spillways ; 
+  'T:Real <- '$3:Real ; 
+  'V:Real <- '$2:Real,
+  '$1:Real <- '0/1.Real ; 
+  '$2:Real <- '#1:Real ; 
+  '$3:Real <- '#2:Real ; 
+  'St:DamState <- '`{_;_;_;_`}['empty.Spillways,'#1:Real,'#2:Real,'true.Bool],(
+    empty).EmptyCommaList,'_and_['_and_['_===_['$4:Real,'_-_['_+_['#1:Real,
+    '_*_['$5:Real,'$6:Real]],'_*_['$7:Real,'$6:Real]]],'_===_['$8:Real,'_+_[
+    '#2:Real,'$6:Real]]],'true.Boolean]}
+Bye.
