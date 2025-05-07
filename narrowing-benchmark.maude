@@ -1,0 +1,829 @@
+***(
+Copyright 2021-2025 Universitat Politècnica de València, Spain
+
+This program is free software: you can redistribute it and/or modify it under the terms 
+of the GNU General Public License as published by the Free Software Foundation, either 
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+)***
+
+load smt
+
+fmod CONVERT-VARIABLES is
+    protecting META-LEVEL .
+    protecting CONVERSION .
+    
+    sorts NeTermSet TermSet .
+    subsort Term < NeTermSet < TermSet .
+    
+    op mt : -> TermSet [ctor] .
+    op _;;_ : TermSet TermSet -> TermSet [assoc comm id: mt] .
+    op _;;_ : NeTermSet TermSet -> NeTermSet [assoc comm id: mt] .
+    eq T:Term ;; T:Term = T:Term .
+
+    var F : Qid .   vars V V' : Variable .   var GT : GroundTerm .   
+    var GNTL : NeGroundTermList .   var NTL : NeTermList .   vars T T' : Term .   
+    var N : Nat .   vars TL TL' TL'' : TermList .   vars SB SB' : Substitution .   var VarType : Type .
+    var TS TS' : TermSet .   var M : Module .   var NTS NTS' : NeTermSet .   vars TLIST1 TLIST2 : TermList .   
+    var CO : Context .   var NCTL : NeCTermList .   var C : Constant .   var GTL : GTermList .
+
+    --- Rename a set of variables to "$" notation
+    op rename : TermSet Nat -> Substitution .
+    eq rename(mt, N) = none .
+    eq rename(V ;; TS, N) = V <- qid("$" + string(N,10) + ":" + string(getType(V))) ; rename(TS, N + 1) .
+
+    op getVars : GTermList -> TermSet .
+    eq getVars([]) = mt .
+    eq getVars(empty) = mt .
+    eq getVars(C) = mt .
+    eq getVars(V) = V .
+    eq getVars(F[NTL]) = getVars(NTL) .
+    eq getVars(F[NCTL]) = getVars(NCTL) .
+    eq getVars((T, NTL)) = getVars(T) ;; getVars(NTL) .
+    eq getVars((CO, NTL)) = getVars(NTL) .
+    eq getVars((T, NCTL)) = getVars(T) ;; getVars(NCTL) .
+
+    op getRangeVars : Substitution -> TermSet .
+    eq getRangeVars((none).Substitution) = mt .
+    eq getRangeVars(V <- T ; SB) = getVars(T) ;; getRangeVars(SB) .
+
+    op getDomainVars : Substitution -> TermSet .
+    eq getDomainVars((none).Substitution) = mt .
+    eq getDomainVars(V <- T ; SB) = V ;; getDomainVars(SB) .
+    
+    op getAllVars : Substitution -> TermSet .
+    eq getAllVars((none).Substitution) = mt .
+    eq getAllVars(V <- T ; SB) = V ;; getVars(T) ;; getAllVars(SB) .
+
+    op getVarsDisjunction : TermSet TermSet -> TermSet .
+    eq getVarsDisjunction((NTS ;; TS), (NTS ;; TS')) = getVarsDisjunction((TS), (TS')) .
+    eq getVarsDisjunction(TS, TS') = TS ;; TS' [owise] .
+
+    op getVarsNumber : TermList -> Nat .
+    op getVarsNumber : TermSet -> Nat .
+    eq getVarsNumber(empty) = 0 .
+    eq getVarsNumber(mt) = 0 .
+    eq getVarsNumber(GT) = 0 .
+    eq getVarsNumber(V) = 1 .
+    eq getVarsNumber(F[NTL]) = getVarsNumber(NTL) .
+    eq getVarsNumber(T ;; NTS) = getVarsNumber(T) + getVarsNumber(NTS) .
+    eq getVarsNumber((T, NTL)) = getVarsNumber(T) + getVarsNumber(NTL) .
+    
+    op applySub : TermList Substitution -> TermList .
+    eq applySub([], SB) = [] .
+    eq applySub(V,(V <- T ; SB)) = T .
+    eq applySub(F[NTL], SB) = F[applySub(NTL, SB)] .
+    eq applySub((T,NTL),SB) = (applySub(T,SB), applySub(NTL,SB)) .
+    eq applySub((empty).TermList, SB) = (empty).TermList .
+    eq applySub(T,SB) = T [owise] .
+
+    op applySub : GTermList Substitution -> GTermList .
+    eq applySub([], SB) = [] .
+    eq applySub(F[NCTL], SB) = F[applySub(NCTL,SB)] .
+    eq applySub((CO, NTL), SB) = (applySub(CO,SB),applySub(NTL,SB)) .
+    eq applySub((T,NCTL), SB) = (applySub(T,SB),applySub(NCTL,SB)) .
+
+    op applySub : TermSet Substitution -> TermList .
+    eq applySub((mt).TermSet, SB) = (mt).TermList .
+    eq applySub(V ;; NTS, SB) = (applySub(V,SB), applySub(NTS,SB)) .
+
+    op applySub : Substitution Substitution -> Substitution .
+    eq applySub((none).Substitution,SB) = none .
+    eq applySub(V <- T ; SB,SB') =  V <- applySub(T,SB') ; applySub(SB,SB') .
+
+    op applySubDomain : Substitution Substitution -> Substitution .
+    eq applySubDomain((none).Substitution,SB) = none .
+    eq applySubDomain(V <- T ; SB,SB') = applySub(V,SB') <- T ; applySubDomain(SB,SB') .
+
+    op undoSub : TermList Substitution -> TermList .
+    eq undoSub([], SB) = [] .
+    eq undoSub(T, (V <- T) ; SB) = V .
+    eq undoSub((T,NTL),SB) = (undoSub(T,SB), undoSub(NTL,SB)) .
+    eq undoSub((empty).TermList, SB) = (empty).TermList .
+    eq undoSub(F[TL], SB) = F[undoSub(TL, SB)] .
+    eq undoSub(T, SB) = T [owise] .
+
+    op addSub : Substitution Substitution -> Substitution .
+    eq addSub((none).Substitution,SB) = SB .
+    eq addSub(SB,(none).Substitution) = SB .
+    eq addSub(V <- T ; SB, V <- T' ; SB') = addSub(V <- T ; SB, SB') .
+    eq addSub(SB, V <- T ; SB') =  addSub(SB ; V <- T, SB') [owise] .
+    
+    op reduceSub : Module Substitution -> Substitution .
+    eq reduceSub(M, (none).Substitution) = (none).Substitution .
+    eq reduceSub(M, V <- T ; SB) = V <- getTerm(metaReduce(M, T)) ; reduceSub(M, SB) .
+endfm
+
+--- Conditional theories conversion
+fmod CONVERT-MODULE is
+    protecting META-MODULE .
+    protecting META-LEVEL .
+    protecting META-TERM .
+    protecting REAL-INTEGER .
+    
+    var MOD : Qid .   var IL : ImportList .   var SS : SortSet .   var SUBSS : SubsortDeclSet .   
+    var OPS : OpDeclSet .   var MBS : MembAxSet .   var EQS EQS1 EQS2 : EquationSet .   vars RLS RLS1 RLS2 : RuleSet .   
+    var STTS : StratDeclSet .   var STTD : StratDefSet .   vars LHS RHS : Term . 
+    vars T1 T2 T3 : Term .   var ATTRS : AttrSet .   var S : Sort .   var SMT1 : Boolean .
+    vars COND1 COND2 : Condition .   vars TP V : Qid .   var BCOND1 BCOND2 : Term .
+    var K : Kind .   var KS : KindSet .
+    
+    op transformMod : Module -> Module .
+
+    eq transformMod(mod MOD is IL sorts SS . SUBSS OPS MBS EQS RLS endm)
+                = mod MOD is IL (protecting 'REAL-INTEGER .) sorts SS ; 'BoolT ; 'Success . SUBSS 
+                    (OPS 
+                        (op 'tt : nil -> 'BoolT [ctor] .)
+                        (op '_&>_ : '`[BoolT`] '`[BoolT`] -> '`[BoolT`] [frozen(2) strat(1 0) left-id('tt.BoolT)] .)        
+                        (op 'success : nil -> 'Success [ctor] .)
+                        (op '_&_ : '`[Success`] '`[Success`] -> '`[Success`] [assoc comm id('success.Success)] .)
+                        addOpDecls(getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))
+                    )
+                    MBS 
+                    transformEqs(addEqs(EQS, (getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))))
+                    transformRules(RLS) endm .
+
+    eq transformMod(th MOD is IL sorts SS . SUBSS OPS MBS EQS RLS endth)
+                = th MOD is IL (protecting 'REAL-INTEGER .) sorts SS ; 'BoolT ; 'Success . SUBSS 
+                    (OPS 
+                        (op 'tt : nil -> 'BoolT [ctor] .)
+                        (op '_&>_ : '`[BoolT`] '`[BoolT`] -> '`[BoolT`] [frozen(2) strat(1 0) left-id('tt.BoolT)] .)        
+                        (op 'success : nil -> 'Success [ctor] .)
+                        (op '_&_ : '`[Success`] '`[Success`] -> '`[Success`] [assoc comm id('success.Success)] .)
+                        addOpDecls(getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))
+                    )
+                    MBS
+                    transformEqs(addEqs(EQS, (getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))))
+                    transformRules(RLS) endth . 
+
+    eq transformMod(smod MOD is IL sorts SS . SUBSS OPS MBS EQS RLS STTS STTD endsm)
+                = smod MOD is IL (protecting 'REAL-INTEGER .) sorts SS ; 'BoolT ; 'Success . SUBSS 
+                    (OPS 
+                        (op 'tt : nil -> 'BoolT [ctor] .)
+                        (op '_&>_ : '`[BoolT`] '`[BoolT`] -> '`[BoolT`] [frozen(2) strat(1 0) left-id('tt.BoolT)] .)        
+                        (op 'success : nil -> 'Success [ctor] .)
+                        (op '_&_ : '`[Success`] '`[Success`] -> '`[Success`] [assoc comm id('success.Success)] .)
+                        addOpDecls(getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))
+                    )
+                    MBS
+                    transformEqs(addEqs(EQS, (getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))))
+                    transformRules(RLS) STTS STTD endsm .
+
+    eq transformMod(sth MOD is IL sorts SS . SUBSS OPS MBS EQS RLS STTS STTD endsth)
+                = sth MOD is IL (protecting 'REAL-INTEGER .) sorts SS ; 'BoolT ; 'Success . SUBSS 
+                    (OPS 
+                        (op 'tt : nil -> 'BoolT [ctor] .)
+                        (op '_&>_ : '`[BoolT`] '`[BoolT`] -> '`[BoolT`] [frozen(2) strat(1 0) left-id('tt.BoolT)] .)        
+                        (op 'success : nil -> 'Success [ctor] .)
+                        (op '_&_ : '`[Success`] '`[Success`] -> '`[Success`] [assoc comm id('success.Success)] .)
+                        addOpDecls(getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))
+                    )
+                    MBS
+                    transformEqs(addEqs(EQS, (getKinds(mod MOD is IL sorts SS ; 'BoolT ; 'Success . SUBSS OPS MBS EQS RLS endm))))
+                    transformRules(RLS) STTS STTD endsth .
+
+    op addEqs : EquationSet KindSet -> EquationSet .    
+    eq addEqs(EQS, K ; KS)
+                = addEqs(
+                    (EQS
+                    eq '_=:=_[addTypeToVar(K,'X), addTypeToVar(K,'X)] = 'tt.BoolT [variant] .
+                    eq '_|_[addTypeToVar(K,'X), 'tt.BoolT] = addTypeToVar(K,'X) [variant] .
+                    eq '_=>>_['success.Success, addTypeToVar(K,'X)] = addTypeToVar(K,'X) [variant] .
+                    eq '_==:==_[addTypeToVar(K,'X), addTypeToVar(K,'X)] = 'success.Success [variant] .),
+                    KS) .
+    eq addEqs(EQS, KS) = (EQS) [owise] .
+
+    op addTypeToVar : Type Qid -> Variable [memo] .
+    eq addTypeToVar(TP, V)
+                = qid(string(V) + ":" + string(TP)) .
+
+    op addOpDecls : KindSet -> OpDeclSet .
+    eq addOpDecls(K ; KS)
+      = (op '_=>>_ : '`[Success`] K -> K [frozen(2) strat(1 0)] .) 
+        (op '_==:==_ : K K -> '`[Success`] [none] .)
+        (op '_=:=_ : K K -> '`[BoolT`] [none] .)
+        (op '_|_ : K '`[BoolT`] -> K [none] .)
+        (op '_>>_ : 'Boolean K -> K [none] .)
+        addOpDecls(KS) .
+    eq addOpDecls(KS) = none [owise] .
+
+    op transformEqs : EquationSet -> EquationSet .
+    eq transformEqs(EQS) = transformVariantConditions(EQS) .
+
+    op transformVariantConditions : EquationSet -> EquationSet .
+    eq transformVariantConditions(EQS1 (ceq LHS = RHS if nil [ATTRS] .) EQS2)
+                = transformVariantConditions(EQS1 EQS2) (eq LHS = RHS [ATTRS variant] .) .
+    eq transformVariantConditions(EQS1 (ceq LHS = RHS if COND1 /\ (T1 = T2) /\ COND2 [ATTRS] .) EQS2)
+                = transformVariantConditions(EQS1 EQS2) transformVariantConditionsAux(ceq LHS = '_|_[RHS,'_=:=_[T1,T2]] if COND1 /\ COND2 [ATTRS] .) .          
+    eq transformVariantConditions(EQS1) = EQS1 [owise] .
+
+    op transformVariantConditionsAux : Equation -> Equation .
+    eq transformVariantConditionsAux(ceq LHS = RHS if nil [ATTRS] .)
+                =  (eq (LHS) = RHS [ATTRS variant] .) .
+    eq transformVariantConditionsAux(ceq '_|_[LHS,T1] = RHS if COND1 /\ (T2 = T3) /\ COND2 [ATTRS] .)
+                = transformVariantConditionsAux(ceq LHS = '_|_[RHS,'_&>_[T1,'_=:=_[T2,T3]]] if COND1 /\ COND2 [ATTRS] .) .
+
+    op transformRules : RuleSet -> RuleSet .
+    eq transformRules(RLS) = transformVariantConditions(transformSMTConditions(transformReachabilityConditions(RLS))) .
+
+    op transformReachabilityConditions : RuleSet -> RuleSet .
+    eq transformReachabilityConditions(RLS1 (crl LHS => RHS if nil [ATTRS] .) RLS2)
+                = transformReachabilityConditions(RLS1 RLS2) (rl LHS => RHS [ATTRS narrowing] .) .
+    eq transformReachabilityConditions(RLS1 (crl LHS => RHS if COND1 /\ (T1 => T2) /\ COND2 [ATTRS] .) RLS2)
+                = transformReachabilityConditions(RLS1 RLS2) transformReachabilityConditionsAux(crl LHS => '_=>>_['_==:==_[T1,T2],RHS] if COND1 /\ COND2 [ATTRS] .) .           
+    eq transformReachabilityConditions(RLS1) = RLS1 [owise] .
+
+    op transformReachabilityConditionsAux : Rule -> Rule .
+    eq transformReachabilityConditionsAux(crl (LHS) => RHS if nil [ATTRS] .)
+                =  (rl (LHS) => RHS [ATTRS narrowing] .) .
+    eq transformReachabilityConditionsAux(crl LHS => '_=>>_[T1,RHS] if COND1 /\ (T2 => T3) /\ COND2 [ATTRS] .)
+                = transformReachabilityConditionsAux(crl LHS => '_=>>_['_&_[T1,'_==:==_[T2,T3]],RHS] if COND1 /\ COND2 [ATTRS] .) .
+    eq transformReachabilityConditionsAux(crl LHS => RHS if COND1 [ATTRS] .)
+                = (crl LHS => RHS if COND1 [ATTRS] .) [owise] .
+
+    op transformSMTConditions : RuleSet -> RuleSet .
+    eq transformSMTConditions(RLS1 (crl LHS => RHS if nil [ATTRS] .) RLS2)
+                = transformSMTConditions(RLS1 RLS2) (rl LHS => RHS [ATTRS narrowing] .) .
+    eq transformSMTConditions(RLS1 (crl LHS => RHS if COND1 /\ (BCOND1 = 'true.Boolean) /\ COND2 [ATTRS] .) RLS2)
+                = transformSMTConditions(RLS1 transformSMTConditionsAux(crl LHS => '_>>_[BCOND1,RHS] if COND1 /\ COND2 [ATTRS] .) RLS2) .
+    eq transformSMTConditions(RLS1 (crl LHS => RHS if COND1 /\ (BCOND1 = 'false.Boolean) /\ COND2 [ATTRS] .) RLS2)
+                = transformSMTConditions(RLS1 transformSMTConditionsAux(crl LHS => '_>>_['not_[BCOND1],RHS] if COND1 /\ COND2 [ATTRS] .) RLS2) .
+    eq transformSMTConditions(RLS1) = RLS1 [owise] .
+
+    op transformSMTConditionsAux : Rule -> Rule .
+    eq transformSMTConditionsAux(crl LHS => RHS if nil [ATTRS] .)
+                =  (rl (LHS) => RHS [ATTRS narrowing] .) .
+    eq transformSMTConditionsAux(crl LHS => '_>>_[BCOND1,RHS] if COND1 /\ (BCOND2 = 'true.Boolean) /\ COND2 [ATTRS] .)
+                = transformSMTConditionsAux(crl LHS => '_>>_['_and_[BCOND1,BCOND2],RHS] if COND1 /\ COND2 [ATTRS] .) .
+    eq transformSMTConditionsAux(crl LHS => '_>>_[BCOND1,RHS] if COND1 /\ (BCOND2 = 'false.Boolean) /\ COND2 [ATTRS] .)
+                = transformSMTConditionsAux(crl LHS => '_>>_['_and_[BCOND1,'not_[BCOND2]],RHS] if COND1 /\ COND2 [ATTRS] .) .
+    eq transformSMTConditionsAux(crl LHS => RHS if COND1 [ATTRS] .)
+                = (crl LHS => RHS if COND1 [ATTRS] .) [owise] .
+
+    op transformVariantConditions : RuleSet -> RuleSet .
+    eq transformVariantConditions(RLS1 (crl LHS => RHS if nil [ATTRS] .) RLS2)
+                = transformVariantConditions(RLS1 RLS2) (rl LHS => RHS [ATTRS narrowing] .) .
+    eq transformVariantConditions(RLS1 (crl LHS => RHS if COND1 /\ (T1 = T2) /\ COND2 [ATTRS] .) RLS2)
+                = transformVariantConditions(RLS1 RLS2) transformVariantConditionsAux(crl '_|_[LHS,'_=:=_[T1,T2]] => RHS if COND1 /\ COND2 [ATTRS] .) .          
+    eq transformVariantConditions(RLS1) = RLS1 [owise] .
+
+    op transformVariantConditionsAux : Rule -> Rule .
+    eq transformVariantConditionsAux(crl LHS => RHS if nil [ATTRS] .)
+                =  (rl (LHS) => RHS [ATTRS narrowing] .) .
+    eq transformVariantConditionsAux(crl '_|_[LHS,T1] => RHS if COND1 /\ (T2 = T3) /\ COND2 [ATTRS] .)
+                = transformVariantConditionsAux(crl '_|_[LHS,'_&>_[T1,'_=:=_[T2,T3]]] => RHS if COND1 /\ COND2 [ATTRS] .) .
+    eq transformVariantConditionsAux(crl LHS => RHS if COND1 [ATTRS] .)
+                = (crl LHS => RHS if COND1 [ATTRS] .) [owise] .
+endfm
+
+fmod NARROWING-STRUCTURES is
+    pr META-LEVEL .
+    pr INT .
+
+    sort UnificationPairList .
+    subsorts UnificationPair < UnificationPairList .
+    op nil : -> UnificationPairList [ctor] .
+    op __ : UnificationPairList UnificationPairList -> UnificationPairList [ctor assoc id: nil] .
+
+    sorts Attribute AttributeSet .
+    subsort Attribute < AttributeSet .
+    op none : -> AttributeSet  [ctor] .
+    op _,_ : AttributeSet AttributeSet -> AttributeSet [ctor assoc comm id: none] .
+
+    *** Attributes of a node
+    op term:_ : Term -> Attribute [ctor prec 20 gather (&)] . --- Term
+    op qid:_ : Qid -> Attribute [ctor prec 20 gather (&)] . --- Variable Qid
+    op acsub:_ : Substitution -> Attribute [ctor prec 20 gather (&)] . --- Accumulated substitution
+    op nirred:_ : TermList -> Attribute [ctor prec 20 gather (&)] . --- Irreducibility constraints
+    op nsmt:_ : TermList -> Attribute [ctor prec 20 gather (&)] . --- SMT constraints
+    op branch:_ : Nat -> Attribute [ctor prec 20 gather (&)] . --- Branch on the "tree"
+    op depth:_ : Nat -> Attribute [ctor prec 20 gather (&)] . --- Depth on the "tree"
+    op fid:_ : Int -> Attribute [ctor prec 20 gather (&)] . --- Folding id (-1 if it doesn't fold)
+    op unifiers:_ : UnificationPairList -> Attribute [ctor prec 20 gather (&)] . --- List of unifiers (with target term)
+    op rule:_ : Qid -> Attribute [ctor prec 20 gather (&)] . --- Rule used in narrowing step
+
+    *** A node has an identifier, a parent identifier and the rest of attributes
+    sort Node .
+    op [_;_;_] : Nat Int AttributeSet -> Node [ctor] .
+  
+    sort NodeList .
+    subsorts Node < NodeList .
+    op nil : -> NodeList [ctor] .
+    op __ : NodeList NodeList -> NodeList [ctor assoc id: nil] .
+    
+    *** Attributes of a narrowing state
+    op mod:_ : Module -> Attribute  [ctor prec 20 gather (&)] . --- Module defining the theory
+    op canonical:_ : Bool -> Attribute [ctor prec 20 gather (&)] . --- Flag to use irreducibility
+    op folding:_ : Bool -> Attribute [ctor prec 20 gather (&)] . --- Flag to use folding
+    op iterm:_ : Term -> Attribute [ctor prec 20 gather (&)] . --- Initial term
+    op arrow:_ : Qid -> Attribute [ctor prec 20 gather (&)] . --- Search arrow
+    op tterm:_ : Term -> Attribute [ctor prec 20 gather (&)] . --- Target term
+    op irred:_ : TermList -> Attribute [ctor prec 20 gather (&)] . --- User irreducibility constraints
+    op smt:_ : TermList -> Attribute [ctor prec 20 gather (&)] . --- User smt constraints
+    op options:_ : VariantOptionSet -> Attribute [ctor prec 20 gather (&)] . --- Variant options
+    op maxsol:_ : Bound -> Attribute [ctor prec 20 gather (&)] . --- Max solutions
+    op maxdepth:_ : Bound -> Attribute [ctor prec 20 gather (&)] . --- Max depth
+    op ncounter:_ : Nat -> Attribute [ctor prec 20 gather (&)] . --- Node counter (For IDs)
+    op initsub:_ : Substitution -> Attribute [ctor prec 20 gather (&)] . --- Initial substitution
+    op vcounter:_ : Nat -> Attribute [ctor prec 20 gather (&)] . --- Variable counter (For renaming)
+
+    *** A narrowing state has attributes, a list of processed nodes and a list of nodes to process
+    sort NarrowState .
+    op <_|_|_> : AttributeSet NodeList NodeList -> NarrowState [ctor] .
+
+    *** An output shows the number of solutions
+    sort BenchmarkOutput .
+    op Solutions:_ : Nat -> BenchmarkOutput .
+endfm
+
+fmod NARROWING-AUX is
+    pr NARROWING-STRUCTURES .
+    pr CONVERT-VARIABLES .
+
+    var M : Module .   var ULIST : UnificationPairList .   var MSOL : Bound .
+    var UPAIR : UnificationPair .   vars TLIST SMT IRRED1 : TermList .   var T T1 : Term .
+    var F QID1 : Qid .   var SB SB1 SB2 SB3 : Substitution .   var RLSET : RuleSet .   var TS : TermSet .
+    var NTS : NeTermSet .   vars LHS RHS : Term .   var ATTRS : AttrSet .   vars TL TL' SMT1 SMT2 : TermList .   
+    var V : Variable .   var N1 PID1 VCOUNTER : Nat .   var ATTRSET1 : AttributeSet .   vars C : Constant . 
+    var NTL NTL' : NeTermList .
+
+    op checkSMT : Module TermList -> Bool .
+    eq checkSMT(M, 'false) = false .
+    eq checkSMT(M, empty) = true .
+    eq checkSMT(M, 'true) = true .
+    eq checkSMT(M, '_->_[SMT, 'true]) = true .
+    eq checkSMT(M, '_->_[SMT, 'empty]) = true .
+    eq checkSMT(M, '_->_['empty, SMT]) = metaCheck(M, SMT) .
+    eq checkSMT(M, '_->_['true, SMT]) = metaCheck(M, SMT) .
+    eq checkSMT(M, SMT) = metaCheck(M, SMT) [owise] .
+
+    op buildImplication : TermList Substitution TermList Substitution Substitution -> TermList .
+    eq buildImplication(SMT1, SB1, SMT2, SB2, SB3) 
+        = 'not_['_implies_[SMT1, applySub(undoSub(applySub(SMT2, SB3), SB2), SB1)]] .
+
+    op removeSMTVars : TermList TermSet -> TermList .
+    eq removeSMTVars(empty, TS) = empty .
+    eq removeSMTVars(TL, mt) = TL .
+    eq removeSMTVars((T, NTL), NTS) = (removeSMTVars(T, NTS), removeSMTVars(NTL, NTS)) .
+    eq removeSMTVars(F[TL, V, TL'], V ;; TS) 
+        = if getType(metaReduce(upModule('REAL-INTEGER,false), F[TL, V, TL'])) == 'Boolean
+          then 'true.Boolean 
+          else F[TL, V, TL']
+          fi .
+    eq removeSMTVars(F[TL], TS) = F[removeSMTVars(TL, TS)] [owise] .
+    eq removeSMTVars(T, TS) = T [owise] .
+
+    op extractTerm : TermList -> TermList .
+    eq extractTerm([]) = [] .
+    eq extractTerm((empty).TermList) = (empty).TermList .
+    eq extractTerm('_>>_[NTL, NTL']) = NTL' .
+    eq extractTerm(F[NTL]) = F[extractTerm(NTL)] .
+    eq extractTerm((T,NTL)) = (T, extractTerm(NTL)) .
+    eq extractTerm(T) = T [owise] .
+
+    op extractAndAddSMT : TermList Term -> Term .
+    eq extractAndAddSMT([], SMT) = SMT .
+    eq extractAndAddSMT((empty).TermList, SMT) = SMT .
+    eq extractAndAddSMT('_>>_[NTL, NTL'], SMT) = '_and_[NTL, SMT] .
+    eq extractAndAddSMT(F[NTL], SMT) = extractAndAddSMT(NTL, SMT) .
+    eq extractAndAddSMT((T, NTL), SMT) = extractAndAddSMT(NTL, SMT) .
+    eq extractAndAddSMT(T, SMT) = SMT [owise] .
+
+    op applySub : TermList Substitution -> TermList .
+    eq applySub([], SB) = [] .
+    eq applySub(V,(V <- T) ; SB) = T .
+    eq applySub(F[TL], SB) = F[applySub(TL, SB)] .
+    eq applySub((T,NTL),SB) = (applySub(T,SB), applySub(NTL,SB)) .
+    eq applySub((empty).TermList, SB) = (empty).TermList .
+    eq applySub(T,SB) = T [owise] .
+
+
+    op isEmpty : TermList -> Bool .
+    eq isEmpty(empty) = (true).Bool .
+    eq isEmpty(TLIST) = (false).Bool [owise] .
+
+    op substractSolutions : Bound UnificationPairList -> Nat .
+    eq substractSolutions(unbounded, ULIST) = unbounded .
+    eq substractSolutions(0, ULIST) = 0 .
+    eq substractSolutions(s(MSOL), nil) = s(MSOL) .
+    eq substractSolutions(s(MSOL), UPAIR ULIST) = substractSolutions(MSOL, ULIST) .
+
+    op addIrreducibleTerm : Module Qid Substitution TermList -> TermList .
+    eq addIrreducibleTerm(M, QID1, SB, IRRED1) 
+        = IRRED1, getTerm(metaReduce(M, applySub(getRuleLhs(getRls(M), QID1), SB))) .
+
+    op getRuleLhs : RuleSet Qid -> Term .
+    eq getRuleLhs(RLSET (rl LHS => RHS [ATTRS label(QID1)] .), QID1) 
+        = LHS .
+
+    op countVars : Node -> Nat .
+    eq countVars(nil) = 0 .
+    eq countVars([N1 ; PID1 ; term: T1, acsub: SB, nirred: IRRED1, nsmt: SMT, ATTRSET1])
+        = getVarsNumber(getVars((T1, IRRED1, SMT)) ;; getRangeVars(SB)) .
+endfm
+
+fmod NARROWING is
+    pr CONVERT-MODULE .
+    pr NARROWING-AUX .
+
+    var M : Module .   vars ITERM TTERM T1 T2 T3 : Term .   vars ARROW QID1 QID2 : Qid .   
+    vars CFLAG FFLAG : Bool .   vars ISMT SMT1 SMT2 : TermList .   vars IIRRED IRRED1 IRRED2 : TermList .   
+    vars MSOL MDEPTH : Bound .   vars NCOUNTER UCOUNTER VCOUNTER MCOUNTER ID1 N1 N2 : Nat .   vars ATTRSET1 ATTRSET2 ATTRSET3 : AttributeSet .   
+    var NSTATE : NarrowState .   var VOS : VariantOptionSet .   var NLIST1 NLIST2 NLIST3 NLIST4 : NodeList .
+    vars ACSB1 ACSB2 SB1 SB2 INITSB : Substitution .   vars NODE1 NODE2 : Node .   
+    var UNIFLIST1 : UnificationPairList .   var UNIFPAIR : UnificationPair .
+    var IPID1 IPID2 IFID1 : Int .   var TYPE1 : Type .   var CTX1 : Context .   vars BRANCH1 DEPTH1 DEPTH2 PID1 PID2 FID1 : Nat .
+
+    op narrowing : Module Term Qid Term Bool Bool Bool Bool TermList TermList Bound Bound -> BenchmarkOutput .
+
+    eq narrowing(M, ITERM, ARROW, TTERM, CFLAG, FFLAG, false, false, IIRRED, ISMT, MSOL, MDEPTH)
+        = checkBounds(< mod: transformMod(M), canonical: CFLAG, folding: FFLAG, 
+                      iterm: applySub(ITERM, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      arrow: ARROW, 
+                      tterm: TTERM,
+                      irred: applySub(IIRRED, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      smt: applySub(ISMT, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      initsub: rename(getVars((ITERM, TTERM, IIRRED, ISMT)),1),
+                      options: none, maxsol: MSOL, maxdepth: MDEPTH, ncounter: 1, 
+                      vcounter: 1 + getVarsNumber(getVars((ITERM, TTERM, IIRRED, ISMT))) | nil | nil >) .
+
+    eq narrowing(M, ITERM, ARROW, TTERM, CFLAG, FFLAG, true, false, IIRRED, ISMT, MSOL, MDEPTH)
+        = checkBounds(< mod: transformMod(M), canonical: CFLAG, folding: FFLAG, 
+                      iterm: applySub(ITERM, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      arrow: ARROW, 
+                      tterm: TTERM,
+                      irred: applySub(IIRRED, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      smt: applySub(ISMT, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      initsub: rename(getVars((ITERM, TTERM, IIRRED, ISMT)),1),
+                      options: filter, maxsol: MSOL, maxdepth: MDEPTH, ncounter: 1, 
+                      vcounter: 1 + getVarsNumber(getVars((ITERM, TTERM, IIRRED, ISMT))) | nil | nil >) .
+
+    eq narrowing(M, ITERM, ARROW, TTERM, CFLAG, FFLAG, false, true, IIRRED, ISMT, MSOL, MDEPTH)
+        = checkBounds(< mod: transformMod(M), canonical: CFLAG, folding: FFLAG, 
+                      iterm: applySub(ITERM, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      arrow: ARROW, 
+                      tterm: TTERM,
+                      irred: applySub(IIRRED, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      smt: applySub(ISMT, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      initsub: rename(getVars((ITERM, TTERM, IIRRED, ISMT)),1),
+                      options: delay, maxsol: MSOL, maxdepth: MDEPTH, ncounter: 1, 
+                      vcounter: 1 + getVarsNumber(getVars((ITERM, TTERM, IIRRED, ISMT))) | nil | nil >) .
+                    
+    eq narrowing(M, ITERM, ARROW, TTERM, CFLAG, FFLAG, true, true, IIRRED, ISMT, MSOL, MDEPTH)
+        = checkBounds(< mod: transformMod(M), canonical: CFLAG, folding: FFLAG, 
+                      iterm: applySub(ITERM, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      arrow: ARROW, 
+                      tterm: TTERM,
+                      irred: applySub(IIRRED, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      smt: applySub(ISMT, rename((getVars((ITERM, TTERM, IIRRED, ISMT))),1)), 
+                      initsub: rename(getVars((ITERM, TTERM, IIRRED, ISMT)),1),
+                      options: filter delay, maxsol: MSOL, maxdepth: MDEPTH, ncounter: 1, 
+                      vcounter: 1 + getVarsNumber(getVars((ITERM, TTERM, IIRRED, ISMT))) | nil | nil >) .
+
+    op checkBounds : NarrowState -> BenchmarkOutput .
+
+    eq checkBounds(< maxsol: 0, ATTRSET1 | nil | nil >) = getBenchmarkOutput(nil) .
+
+    eq checkBounds(< maxdepth: 0, ATTRSET1 | nil | nil >) = getBenchmarkOutput(nil) .
+
+    eq checkBounds(NSTATE) = checkInitialSMT(NSTATE) [owise] .
+
+    op checkInitialSMT : NarrowState -> BenchmarkOutput .
+    
+    eq checkInitialSMT(< mod: M, smt: ISMT, irred: IIRRED, ATTRSET1 | nil | nil >) 
+      = if checkSMT(M, ISMT)
+        then
+          checkSearchType(< mod: M, smt: ISMT, irred: IIRRED, ATTRSET1 | nil | nil >) 
+        else
+          getBenchmarkOutput(nil)
+        fi .
+
+    op checkSearchType : NarrowState -> BenchmarkOutput .
+ 
+    eq checkSearchType(< mod: M, iterm: ITERM, tterm: TTERM, initsub: INITSB, irred: IIRRED, smt: ISMT, options: VOS, 
+                       arrow: '=>1, maxdepth: MDEPTH, maxsol: MSOL, ATTRSET1 | nil | nil >)
+        = checkMaxSolutions(< mod: M, iterm: ITERM, tterm: TTERM, irred: IIRRED, smt: ISMT, options: VOS, arrow: '=>1, 
+                            maxdepth: 1, maxsol: substractSolutions(MSOL, getUnifiers(M, ITERM, applySub(TTERM,INITSB), '@, VOS, IIRRED, MSOL, 0)), ATTRSET1 | nil | 
+                            [0 ; -1 ; term: ITERM, rule: 'none, acsub: INITSB, nirred: IIRRED, nsmt: ISMT, branch: 0, depth: 0, fid: -1, qid: '@, 
+                            unifiers: getUnifiers(M, ITERM, applySub(TTERM,INITSB), '@, VOS, IIRRED, MSOL, 0)] >) .
+
+    eq checkSearchType(< iterm: ITERM, initsub: INITSB, irred: IIRRED, smt: ISMT, arrow: '=>+, ATTRSET1 | nil | nil >)
+        = checkMaxSolutions(< iterm: ITERM, irred: IIRRED, smt: ISMT, arrow: '=>+, ATTRSET1 | nil | 
+                            [0 ; -1 ; term: ITERM, rule: 'none, acsub: INITSB, nirred: IIRRED, nsmt: ISMT, branch: 0, depth: 0, fid: -1, qid: '@,  unifiers: nil] >) .
+
+    eq checkSearchType(< mod: M, iterm: ITERM, tterm: TTERM, initsub: INITSB, irred: IIRRED, smt: ISMT, options: VOS, 
+                       arrow: '=>*, maxdepth: MDEPTH, maxsol: MSOL, ATTRSET1 | nil | nil >)
+        = checkMaxSolutions(< mod: M, iterm: ITERM, tterm: TTERM, irred: IIRRED, smt: ISMT, options: VOS, arrow: '=>*, 
+                            maxdepth: MDEPTH, maxsol: substractSolutions(MSOL,getUnifiers(M, ITERM, applySub(TTERM,INITSB), '@, VOS, IIRRED, MSOL, 0)), ATTRSET1 | nil | 
+                            [0 ; -1 ; term: ITERM, rule: 'none, acsub: INITSB, nirred: IIRRED, nsmt: ISMT, branch: 0, depth: 0, fid: -1, qid: '@,  
+                            unifiers: getUnifiers(M, ITERM, applySub(TTERM,INITSB), '@, VOS, IIRRED, MSOL, 0)] >) .
+
+    op checkMaxSolutions : NarrowState -> BenchmarkOutput .
+
+    eq checkMaxSolutions(< mod: M, maxsol: 0, ATTRSET1 | NLIST1 | NLIST2 >) = getBenchmarkOutput(NLIST1 NLIST2) .
+
+    eq checkMaxSolutions(< maxsol: MSOL, ATTRSET1 | NLIST1 | NLIST2 >) = generateNode(< maxsol: MSOL, ATTRSET1 | NLIST1 | NLIST2 >) .
+
+    op getUnifiers : Module Term Term Qid VariantOptionSet TermList Nat Nat -> UnificationPairList .
+    
+    eq getUnifiers(M, T1, T2, QID1, VOS, IRRED1, 0, UCOUNTER) = nil .
+
+    eq getUnifiers(M, T1, T2, QID1, VOS, IRRED1, unbounded, UCOUNTER)
+        = if metaVariantUnify(M, T1 =? T2, IRRED1, QID1, VOS, UCOUNTER) :: UnificationPair
+          then
+            metaVariantUnify(M, T1 =? T2, IRRED1, QID1, VOS, UCOUNTER) getUnifiers(M, T1, T2, QID1, VOS, IRRED1, unbounded, s(UCOUNTER))
+          else
+           nil
+          fi .
+
+    eq getUnifiers(M, T1, T2, QID1, VOS, IRRED1, s(MSOL), UCOUNTER)
+        = if metaVariantUnify(M, T1 =? T2, IRRED1, QID1, VOS, UCOUNTER) :: UnificationPair
+          then
+            metaVariantUnify(M, T1 =? T2, IRRED1, QID1, VOS, UCOUNTER) getUnifiers(M, T1, T2, QID1, VOS, IRRED1, MSOL, s(UCOUNTER))
+          else
+           nil
+          fi .
+
+    op generateNode : NarrowState -> BenchmarkOutput .
+
+    eq generateNode(< mod: M, ATTRSET1 | NLIST1 | nil >) = getBenchmarkOutput(NLIST1) .
+
+    eq generateNode(< mod: M, iterm: ITERM, irred: IIRRED, smt: ISMT, options: VOS, canonical: CFLAG, ncounter: NCOUNTER, vcounter: VCOUNTER, ATTRSET1 | nil | 
+                    [0 ; -1 ; acsub: ACSB1, ATTRSET2] >)
+        = checkNodeSMT(< mod: M, iterm: ITERM, irred: IIRRED, smt: ISMT, options: VOS, canonical: CFLAG, ncounter: s(NCOUNTER),
+                               vcounter: 
+                                  (VCOUNTER + countVars(buildNode(M, VCOUNTER, s(NCOUNTER), 0, metaNarrowingApply(M, ITERM, IIRRED, '@, VOS, 0), 
+                                  acsub: ACSB1, nsmt: ISMT, nirred: IIRRED, canonical: CFLAG, branch: 0, depth: 1))), 
+                               ATTRSET1 | 
+                               [0 ; -1 ; acsub: ACSB1, ATTRSET2] | 
+                               buildNode(M, VCOUNTER, s(NCOUNTER), 0, 
+                                  metaNarrowingApply(M, ITERM, IIRRED, '@, VOS, 0), 
+                                  acsub: ACSB1, nsmt: ISMT, nirred: IIRRED, canonical: CFLAG, branch: 0, depth: 1) >) .
+
+    --- Folded node (do not deploy children)
+    eq generateNode(< mod: M, options: VOS, canonical: CFLAG, ncounter: NCOUNTER, vcounter: VCOUNTER, ATTRSET1 | 
+                    NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2 | 
+                    [ID1 ; PID1 ; branch: BRANCH1, depth: DEPTH1, fid: FID1, ATTRSET3] NLIST3 >)
+        = checkNodeSMT(< mod: M, options: VOS, canonical: CFLAG, ncounter: s(NCOUNTER), 
+                       vcounter: 
+                          (VCOUNTER + countVars(buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: DEPTH1))),  
+                       ATTRSET1 | 
+                       NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2
+                       [ID1 ; PID1 ; branch: BRANCH1, depth: DEPTH1, fid: FID1, ATTRSET3] | 
+                       buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: DEPTH1) NLIST3 >) .
+
+    --- Max depth reached (when numeric)
+    eq generateNode(< mod: M, options: VOS, canonical: CFLAG, ncounter: NCOUNTER, vcounter: VCOUNTER, maxdepth: s(MDEPTH), ATTRSET1 | 
+                    NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2 | 
+                    [ID1 ; PID1 ; branch: BRANCH1, depth: s(MDEPTH), ATTRSET3] NLIST3 >)
+        = checkNodeSMT(< mod: M, options: VOS, canonical: CFLAG, ncounter: s(NCOUNTER), 
+                       vcounter: 
+                          (VCOUNTER + countVars(buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: s(MDEPTH)))),  
+                       maxdepth: s(MDEPTH), ATTRSET1 |
+                       NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2
+                       [ID1 ; PID1 ; branch: BRANCH1, depth: s(MDEPTH), ATTRSET3] | 
+                       buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: s(MDEPTH)) NLIST3 >) .
+
+    --- Not folded node, max depth not reached or unbounded
+    eq generateNode(< mod: M, options: VOS, canonical: CFLAG, ncounter: NCOUNTER, vcounter: VCOUNTER, ATTRSET1 | 
+                    NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2 | 
+                    [ID1 ; PID1 ; term: T2, acsub: ACSB2, nirred: IRRED2, nsmt: SMT2, qid: QID2, branch: BRANCH1, depth: MDEPTH, ATTRSET3] NLIST3 >)
+        = checkNodeSMT(< mod: M, options: VOS, canonical: CFLAG, ncounter: s(s(NCOUNTER)), 
+                       vcounter: 
+                          (VCOUNTER + 
+                          countVars(buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: MDEPTH)) +
+                          countVars(buildNode(M, VCOUNTER + 
+                          countVars(buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: MDEPTH)), s(s(NCOUNTER)), ID1, 
+                          metaNarrowingApply(M, T2, IRRED2, QID2, VOS, 0), 
+                          acsub: ACSB2, nsmt: SMT2, nirred: IRRED2, canonical: CFLAG, branch: 0, depth: s(MDEPTH)))),
+                       ATTRSET1 | 
+                       NLIST1 [PID1 ; IPID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, qid: QID1, ATTRSET2] NLIST2
+                       [ID1 ; PID1 ; term: T2, acsub: ACSB2, nirred: IRRED2, nsmt: SMT2, qid: QID2, branch: BRANCH1, depth: MDEPTH, ATTRSET3] | 
+                       buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: MDEPTH) 
+                       NLIST3 
+                       buildNode(M, VCOUNTER + 
+                          countVars(buildNode(M, VCOUNTER, s(NCOUNTER), PID1, 
+                          metaNarrowingApply(M, T1, IRRED1, QID1, VOS, s(BRANCH1)), 
+                          acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, canonical: CFLAG, branch: s(BRANCH1), depth: MDEPTH)), s(s(NCOUNTER)), ID1, 
+                          metaNarrowingApply(M, T2, IRRED2, QID2, VOS, 0), 
+                          acsub: ACSB2, nsmt: SMT2, nirred: IRRED2, canonical: CFLAG, branch: 0, depth: s(MDEPTH)) >) .
+
+    op buildNode : Module Nat Nat Int NarrowingApplyResult? AttributeSet -> Node .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, failure, ATTRSET1) = nil .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, {T1, TYPE1, CTX1, QID1, SB1, SB2, QID2}, acsub: ACSB1, nsmt: SMT2, nirred: IRRED1, 
+                 canonical: false, branch: BRANCH1, depth: DEPTH1)
+        = renameNode(([N1 ; PID1 ; term: extractTerm(T1), qid: QID2, rule: QID1,
+            acsub: applySub(ACSB1, SB1), 
+            nirred: empty, 
+            nsmt: removeSMTVars(extractAndAddSMT(T1, applySub(SMT2, SB1)),
+                                  getVarsDisjunction(getVars(extractAndAddSMT(T1, applySub(SMT2, SB1))), 
+                                    getVars(extractTerm(T1)) ;; getRangeVars(applySub(ACSB1, SB1)))),
+            branch: BRANCH1, depth: DEPTH1, fid: -1, unifiers: nil]),
+            VCOUNTER) .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, {'_>>_[SMT1,T1], TYPE1, CTX1, QID1, SB1, SB2, QID2}, acsub: ACSB1, nsmt: SMT2, nirred: IRRED1, 
+                 canonical: false, branch: BRANCH1, depth: DEPTH1)
+        = renameNode(([N1 ; PID1 ; term: T1, qid: QID2, rule: QID1,
+            acsub: applySub(ACSB1, SB1), 
+            nirred: empty, 
+            nsmt: removeSMTVars('_and_[SMT1, applySub(SMT2, SB1)],
+                                  getVarsDisjunction(getVars('_and_[SMT1, applySub(SMT2, SB1)]), 
+                                    getVars(T1) ;; getRangeVars(applySub(ACSB1, SB1)))),
+            branch: BRANCH1, depth: DEPTH1, fid: -1, unifiers: nil]),
+            VCOUNTER) .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, {T1, TYPE1, CTX1, QID1, SB1, SB2, QID2}, acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, 
+                 canonical: false, branch: BRANCH1, depth: DEPTH1)
+        = renameNode(([N1 ; PID1 ; term: T1, qid: QID2, rule: QID1, 
+            acsub: applySub(ACSB1, SB1), 
+            nirred: empty, 
+            nsmt: removeSMTVars(applySub(SMT1, SB1),
+                                  getVarsDisjunction(getVars(applySub(SMT1, SB1)), 
+                                      getVars(T1) ;; getRangeVars(applySub(ACSB1, SB1)))),
+            branch: BRANCH1, depth: DEPTH1, fid: -1, unifiers: nil]),
+            VCOUNTER) [owise] .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, {'_>>_[SMT1,T1], TYPE1, CTX1, QID1, SB1, SB2, QID2}, acsub: ACSB1, nsmt: SMT2, nirred: IRRED1, 
+                 canonical: true, branch: BRANCH1, depth: DEPTH1)
+        = renameNode(([N1 ; PID1 ; term: T1, qid: QID2, rule: QID1,
+            acsub: applySub(ACSB1, SB1), 
+            nirred: addIrreducibleTerm(M, QID1, SB2, applySub(IRRED1, SB1)),
+            nsmt: removeSMTVars('_and_[SMT1, applySub(SMT2, SB1)],
+                                  getVarsDisjunction(getVars('_and_[SMT1, applySub(SMT2, SB1)]), 
+                                    getVars(T1) ;; getRangeVars(applySub(ACSB1, SB1)))),
+            branch: BRANCH1, depth: DEPTH1, fid: -1, unifiers: nil]),
+            VCOUNTER) .
+
+    eq buildNode(M, VCOUNTER, N1, PID1, {T1, TYPE1, CTX1, QID1, SB1, SB2, QID2}, acsub: ACSB1, nsmt: SMT1, nirred: IRRED1, 
+                 canonical: true, branch: BRANCH1, depth: DEPTH1)
+        = renameNode(([N1 ; PID1 ; term: T1, qid: QID2, rule: QID1, 
+            acsub: applySub(ACSB1, SB1), 
+            nirred: addIrreducibleTerm(M, QID1, SB2, applySub(IRRED1, SB1)), 
+            nsmt: removeSMTVars(applySub(SMT1, SB1),
+                                  getVarsDisjunction(getVars(applySub(SMT1, SB1)), 
+                                      getVars(T1) ;; getRangeVars(applySub(ACSB1, SB1)))),
+            branch: BRANCH1, depth: DEPTH1, fid: -1, unifiers: nil]),
+            VCOUNTER) [owise] .
+
+    op renameNode : Node Nat -> Node .
+
+    eq renameNode([N1 ; PID1 ; term: T1, acsub: ACSB1, nirred: IRRED1, nsmt: SMT1, ATTRSET1], VCOUNTER)
+        = [N1 ; PID1 ; 
+          term: applySub(T1, rename(getVars((T1, IRRED1, SMT1)) ;; getRangeVars(ACSB1), VCOUNTER)),
+          acsub: applySub(ACSB1, rename(getVars((T1, IRRED1, SMT1)) ;; getRangeVars(ACSB1), VCOUNTER)),
+          nirred: applySub(IRRED1, rename(getVars((T1, IRRED1, SMT1)) ;; getRangeVars(ACSB1), VCOUNTER)), 
+          nsmt: applySub(SMT1, rename(getVars((T1, IRRED1, SMT1)) ;; getRangeVars(ACSB1), VCOUNTER)),
+          ATTRSET1] .
+
+    op checkNodeSMT : NarrowState -> BenchmarkOutput .
+
+    eq checkNodeSMT(< mod: M, ATTRSET1 | NLIST1 | [N1 ; PID1 ; nsmt: SMT1, ATTRSET2] NLIST2 >)
+        = if checkSMT(M, SMT1)
+          then
+            checkFolding(< mod: M, ATTRSET1 | NLIST1 | [N1 ; PID1 ; nsmt: SMT1, ATTRSET2] NLIST2 >)
+          else
+            generateNode(< mod: M, ATTRSET1 | NLIST1 | [N1 ; PID1 ; nsmt: SMT1, ATTRSET2] NLIST2 >)
+          fi .
+
+    eq checkNodeSMT(< mod: M, ATTRSET1 | NLIST1 | nil >) = getBenchmarkOutput(NLIST1) .
+
+    op checkFolding : NarrowState -> BenchmarkOutput .
+
+    eq checkFolding(< mod: M, ATTRSET1 | NLIST1 | nil >) = getBenchmarkOutput(NLIST1) .
+
+    eq checkFolding(< mod: M, folding: false, ATTRSET1 | NLIST1 | NODE1 NLIST2 >)
+        = checkNodeSolutions(< mod: M, folding: false, ATTRSET1 | NLIST1 | NODE1 NLIST2 >) .
+
+    eq checkFolding(< mod: M, folding: true, ATTRSET1 | NLIST1 | NODE1 NLIST2 >)
+        = checkFoldingAux(< mod: M, folding: true, ATTRSET1 | NLIST1 | NODE1 NLIST2 >) .
+    
+    op checkFoldingAux : NarrowState -> BenchmarkOutput .
+
+    eq checkFoldingAux(< mod: M, options: VOS, ATTRSET1 | NLIST1 | [N1 ; PID1 ; fid: -1, ATTRSET2] NLIST2 >)
+        = checkPreviousFolding(< mod: M, options: VOS, ATTRSET1 | NLIST1 | checkNodeFolding(M, VOS, [N1 ; PID1 ; fid: -1, ATTRSET2], NLIST1) NLIST2 >, NLIST1) .
+
+    eq checkFoldingAux(< mod: M, ATTRSET1 | NLIST1 | NODE1 NLIST2 >)
+        = generateNode(< mod: M, maxsol: 0, ATTRSET1 | NLIST1 NODE1 | NLIST2 >) [owise] .
+
+    op checkNodeFolding : Module VariantOptionSet Node NodeList -> Node .
+    
+    eq checkNodeFolding(M, VOS, NODE1, nil) = NODE1 .
+
+    eq checkNodeFolding(M, VOS, [N1 ; PID1 ; fid: N2, ATTRSET1], NLIST1) = [N1 ; PID1 ; fid: N2, ATTRSET1] .
+
+    eq checkNodeFolding(M, VOS, NODE1, (NLIST1 [N1 ; PID2 ; fid: N2, ATTRSET1] NLIST2))
+        = checkNodeFolding(M, VOS, NODE1, (NLIST1 NLIST2)) .
+
+    eq checkNodeFolding(M, VOS, [N1 ; IPID1 ; fid: -1, ATTRSET1], (NLIST1 [N2 ; IPID2 ; fid: -1, ATTRSET2] NLIST2))
+        = if checkFoldingConditions(M, VOS, [N1 ; IPID1 ; fid: -1, ATTRSET1], [N2 ; IPID2 ; fid: -1, ATTRSET2], 0)
+          then
+            [N1 ; IPID1 ; fid: N2, ATTRSET1]
+          else
+            checkNodeFolding(M, VOS, [N1 ; IPID1 ; fid: -1, ATTRSET1], (NLIST1 NLIST2))
+          fi .
+
+    op checkFoldingConditions : Module VariantOptionSet Node Node Nat -> Bool .
+
+    eq checkFoldingConditions(M, VOS, [N1 ; IPID1 ; term: T1, fid: -1, nsmt: SMT1, depth: DEPTH1, acsub: ACSB1, ATTRSET1], 
+                                      [N2 ; IPID2 ; term: T2, fid: -1, nsmt: SMT2, nirred: IRRED1, depth: DEPTH2, acsub: ACSB2, ATTRSET2], MCOUNTER)
+        = if DEPTH1 >= DEPTH2 and-then
+             metaVariantMatch(M, T2 <=? T1, IRRED1, '%, VOS, MCOUNTER) :: Substitution
+          then
+            if (isEmpty(SMT1)) or-else isEmpty(SMT2) or-else 
+               checkSMT(M, buildImplication(SMT1, ACSB1, SMT2, ACSB2,
+                                              metaVariantMatch(M, T2 <=? T1, IRRED1, '%, VOS, MCOUNTER))) 
+               == false
+            then
+              true
+            else
+              checkFoldingConditions(M, VOS, [N1 ; IPID1 ; term: T1, fid: -1, nsmt: SMT1, depth: DEPTH1, acsub: ACSB1, ATTRSET1], 
+                                             [N2 ; IPID2 ; term: T2, fid: -1, nsmt: SMT2, nirred: IRRED1, depth: DEPTH2, acsub: ACSB2, ATTRSET2], s(MCOUNTER))
+            fi
+          else
+            false
+          fi .
+
+    op checkPreviousFolding : NarrowState NodeList -> BenchmarkOutput .
+    
+    eq checkPreviousFolding(< mod: M, options: VOS, ATTRSET1 | NLIST1 | [N1 ; PID1 ; fid: -1, ATTRSET2] NLIST2 >, NLIST1)
+        = checkNodeSolutions(< mod: M, options: VOS, ATTRSET1 | 
+                           checkPreviousFoldingAux(M, VOS, NLIST1, [N1 ; PID1 ; fid: -1, ATTRSET2]) | 
+                           [N1 ; PID1 ; fid: -1, ATTRSET2] NLIST2 >) .
+
+    eq checkPreviousFolding(< mod: M, ATTRSET1 | NLIST1 | NLIST2 >, NLIST1) 
+        = checkNodeSolutions(< mod: M, ATTRSET1 | NLIST1 | NLIST2 >) [owise] .
+
+    op checkPreviousFoldingAux : Module VariantOptionSet NodeList Node -> NodeList .
+
+    eq checkPreviousFoldingAux(M, VOS, nil, NODE1) = nil .
+
+    eq checkPreviousFoldingAux(M, VOS, [N1 ; IPID1 ; fid: -1, ATTRSET1] NLIST1, [N2 ; IPID2 ; fid: -1, ATTRSET2])
+        = if checkFoldingConditions(M, VOS, [N1 ; IPID1 ; fid: -1, ATTRSET1], [N2 ; IPID2 ; fid: -1, ATTRSET2], 0)
+          then
+            [N1 ; IPID1 ; fid: N2, ATTRSET1] checkPreviousFoldingAux(M, VOS, NLIST1, [N2 ; IPID2 ; fid: -1, ATTRSET2])
+          else
+            [N1 ; IPID1 ; fid: -1, ATTRSET1] checkPreviousFoldingAux(M, VOS, NLIST1, [N2 ; IPID2 ; fid: -1, ATTRSET2])
+          fi .
+
+    eq checkPreviousFoldingAux(M, VOS, NODE1 NLIST1, NODE2)
+        = NODE1 checkPreviousFoldingAux(M, VOS, NLIST1, NODE2) [owise] .
+
+    op removeChildren : NarrowState -> BenchmarkOutput .
+
+    eq removeChildren(< mod: M, ATTRSET1 | NLIST1 [N1 ; IPID1 ; fid: -1, ATTRSET1]  NLIST2 
+                      | NLIST3 [N2 ; IPID2 ; fid: N1, ATTRSET2] NLIST4 >) 
+        = removeChildren(< mod: M, ATTRSET1 | NLIST1 [N1 ; IPID1 ; fid: -1, ATTRSET1]  NLIST2 
+                      | NLIST3 NLIST4 >) .
+    
+    eq removeChildren(NSTATE) = checkNodeSolutions(NSTATE) [owise] .
+
+    op checkNodeSolutions : NarrowState -> BenchmarkOutput .
+
+    eq checkNodeSolutions(< mod: M, tterm: TTERM, options: VOS, maxsol: MSOL, ATTRSET1 | NLIST1 | 
+                          [ID1 ; PID1 ; term: T1, fid: -1, qid: QID1, nirred: IRRED1, acsub: ACSB1, unifiers: nil, ATTRSET2] NLIST2 >)
+        = checkMaxSolutions(< mod: M, tterm: TTERM, options: VOS, 
+                            maxsol: (substractSolutions(MSOL, getUnifiers(M, T1, applySub(TTERM, ACSB1), QID1, VOS, IRRED1, MSOL, 0))), 
+                            ATTRSET1 | NLIST1 | 
+                            [ID1 ; PID1 ; term: T1, fid: -1, qid: QID1, nirred: IRRED1, acsub: ACSB1, 
+                            unifiers: getUnifiers(M, T1, applySub(TTERM, ACSB1), QID1, VOS, IRRED1, MSOL, 0), ATTRSET2] NLIST2 >) .
+
+    eq checkNodeSolutions(< mod: M, ATTRSET1 | NLIST1 | [ID1 ; PID1 ; fid: PID2, ATTRSET2] NLIST2 >)
+        = generateNode(< mod: M, ATTRSET1 | NLIST1 | [ID1 ; PID1 ; fid: PID2, ATTRSET2] NLIST2 >) .
+        
+    eq checkNodeSolutions(< mod: M, ATTRSET1 | NLIST1 | NLIST2 >)
+        = getBenchmarkOutput(NLIST1 NLIST2) [owise] .
+
+    op getBenchmarkOutput : NodeList -> BenchmarkOutput .
+    eq getBenchmarkOutput(nil) = Solutions: 0 .
+    eq getBenchmarkOutput(NLIST1) = Solutions: getSolutionsNumber(NLIST1) .
+
+    op getSolutionsNumber : NodeList -> Nat .
+    eq getSolutionsNumber(nil) = 0 .
+    eq getSolutionsNumber(NODE1 NLIST1)
+        = getSolutionsNumberAux(NODE1) + getSolutionsNumber(NLIST1) .
+
+    op getSolutionsNumberAux : Node -> Nat .
+    eq getSolutionsNumberAux([ID1 ; IPID1 ; term: T1, rule: QID1, acsub: ACSB1, 
+            nirred: IRRED1, nsmt: SMT1, unifiers: ({SB1, QID2} UNIFLIST1), ATTRSET1])
+        = 1 + getSolutionsNumberAux([ID1 ; IPID1 ; term: T1, rule: QID1, acsub: ACSB1, 
+            nirred: IRRED1, nsmt: SMT1, unifiers: (UNIFLIST1), ATTRSET1]) .
+    eq getSolutionsNumberAux(NODE1) = 0 [owise] .
+endfm

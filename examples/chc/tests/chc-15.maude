@@ -1,0 +1,11 @@
+mod EXECUTE-EXAMPLE is
+  protecting NARROWING .
+  protecting CHC .
+endm
+ 
+reduce in EXECUTE-EXAMPLE :
+    narrowing(upModule('CHC, false),
+    upTerm((while x:Name > 0{(r:Name = (r:Name + x:Name)) ; (x:Name = pred(x:Name))} | (x:Name -> X:iNat ++ Z:iNat) : (r:Name -> R:iNat))),
+    '=>*,
+    upTerm(skip | (x:Name -> 0) : (r:Name -> R:iNat)), 
+    true, false, false, false, empty, empty, unbounded, 15) .

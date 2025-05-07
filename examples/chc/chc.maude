@@ -1,0 +1,122 @@
+set include BOOL off .
+
+fmod BOOL-FVP is
+   sort IBool .
+
+   op true : -> IBool [ctor] .
+   op false : -> IBool [ctor] .
+   op _and_ : IBool IBool -> IBool [assoc comm] .
+   op _xor_ : IBool IBool -> IBool [assoc comm] .
+   op not_ : IBool -> IBool .
+   op _or_ : IBool IBool -> IBool . 
+   op _<=>_ : IBool IBool -> IBool .
+
+   vars X Y Z W : IBool .
+
+   eq X and true = X [variant] .
+   eq X and false = false [variant] .
+   eq X and X = X  [variant] .
+   eq X and X and Y = X and Y [variant] .   *** AC extension
+   eq X xor false = X [variant] .
+   eq X xor X = false [variant] .
+   eq X xor X xor Y = Y [variant] .         *** AC extension
+   eq not X = X xor true [variant] .
+   eq X or Y = (X and Y) xor X xor Y [variant] .
+   eq X <=> Y = true xor X xor Y [variant] .
+endfm
+
+fmod NAT-FVP is 
+    protecting BOOL-FVP .
+    sort iNat .
+
+    ops 0 1 : -> iNat [ctor] .
+    op _+_ : iNat iNat -> iNat [ctor assoc comm id: 0] .
+    
+    op _>_ : [iNat] [iNat] -> IBool .
+    eq X:[iNat] + Y:[iNat] + 1 > X:[iNat] = true [variant] .
+    eq X:[iNat] > X:[iNat] + Y:[iNat] = false [variant] .
+    
+    op p : [iNat] -> [iNat] .
+    eq p(X:[iNat] + 1) = X:[iNat] [variant] .
+endfm
+
+mod CHC is
+  protecting NAT-FVP * (op _+_ to _++_, op _>_ to _>>_) .
+  
+  sort Name .
+  ops a b c d e f g h i j k l m n o p q r s t u v w x y z : -> Name .
+
+  sort State .
+  op _|_ : Program Memory -> State .
+  
+  sorts Binding Memory . subsort Binding < Memory .
+  op _->_ : Name iNat -> Binding .
+  op empty : -> Memory .
+  op _:_ : Memory Memory -> Memory [assoc comm id: empty] .
+  op _::_ : Memory Binding -> [Memory] .
+  eq ((X:Name -> N:iNat) : M:Memory) :: (X:Name -> M:iNat) = (X:Name -> M:iNat) : M:Memory [variant] .
+  
+  sorts Program Exp .
+  subsorts Name iNat IBool < Exp < Program .
+  
+  op skip : -> Program .
+  op _;_ : Program Program -> Program [assoc id: skip] .
+  op while_{_} : Exp Program -> Program .
+  op _=_ : Name Exp -> Program .
+  ops assume assert : IBool -> Program .
+  ops _+_ _>_ : Exp Exp -> Exp . 
+  op pred : Exp -> Exp .
+  op iNat_ : Name -> Program .
+
+  --- New Variable
+  rl [v1] : 
+      (iNat N:Name) ; P:Program | M:Memory                    
+  =>                  P:Program | M:Memory : (N:Name -> 0) [narrowing] .
+
+  --- Assignment
+  rl [a1] :   (N:Name = E:Exp) ; P:Program | M:Memory                    
+  =>  E:Exp ; (N:Name = E:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [a2] : N:iNat ; (N:Name = E:Exp) ; P:Program | M:Memory                    
+  =>  P:Program | (M:Memory :: (N:Name -> N:iNat)) [narrowing] .
+
+  --- Variable
+  rl [r4] : N:Name ; P:Program | M:Memory : (N:Name -> N:iNat)
+  =>  N:iNat ; P:Program | M:Memory : (N:Name -> N:iNat) [narrowing] .
+
+  --- Greater than
+  rl [r5] : (E1:Exp > E2:Exp) ; P:Program | M:Memory
+  =>  E1:Exp ; (E1:Exp > E2:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [r6] : N:iNat ; (E1:Exp > E2:Exp) ; P:Program | M:Memory
+  =>  E2:Exp ; N:iNat ; (E1:Exp > E2:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [r7] : N2:iNat ; N1:iNat ; (E1:Exp > E2:Exp) ; P:Program | M:Memory
+  =>  (N1:iNat >> N2:iNat) ; P:Program | M:Memory [narrowing] .
+
+  --- Addition
+  rl [r8] : (E1:Exp + E2:Exp) ; P:Program | M:Memory
+  =>  E1:Exp ; (E1:Exp + E2:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [r9] : N:iNat ; (E1:Exp + E2:Exp) ; P:Program | M:Memory
+  =>  E2:Exp ; N:iNat ; (E1:Exp + E2:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [r10] : N2:iNat ; N1:iNat ; (E1:Exp + E2:Exp) ; P:Program | M:Memory
+  =>  (N1:iNat ++ N2:iNat) ; P:Program | M:Memory [narrowing] .
+
+  --- Predecessor
+  rl [r11] : pred(Ex:Exp) ; P:Program | M:Memory
+  =>  Ex:Exp ; pred(Ex:Exp) ; P:Program | M:Memory [narrowing] .
+
+  rl [r12] : N:iNat ; pred(Ex:Exp) ; P:Program | M:Memory
+  =>  p(N:iNat) ; P:Program | M:Memory [narrowing] .
+
+  --- While 
+  crl [while-1] : (while E:Exp {B:Program}) ; P:Program                 | M:Memory
+                  =>  B:Program ; (while E:Exp {B:Program}) ; P:Program | M':Memory
+                  if E:Exp | M:Memory => true                           | M':Memory [nonexec] .
+
+  crl [while-2] : (while E:Exp {B:Program}) ; P:Program                 | M:Memory
+                  =>  P:Program                                         | M':Memory
+                  if E:Exp | M:Memory => false                          | M':Memory [nonexec] .
+endm

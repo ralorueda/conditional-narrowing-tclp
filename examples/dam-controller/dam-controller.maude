@@ -1,0 +1,80 @@
+***(
+Copyright 2021-2025 Universitat Politècnica de València, Spain
+
+This program is free software: you can redistribute it and/or modify it under the terms 
+of the GNU General Public License as published by the Free Software Foundation, either 
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+)***
+
+load smt
+
+mod DAM-CONTROLLER is
+  protecting REAL . 
+  protecting BOOL . 
+  
+  sorts SpillwayId Aperture Spillway Spillways DamState .
+  subsort Spillway < Spillways .
+
+  --- There are 4 kinds of apertures
+  ops close open1 open2 open3 : -> Aperture [ctor] .
+  
+  --- Each spillway has an ID and an opening associated with it.
+  op `[_`,_`] : SpillwayId Aperture -> Spillway [ctor] .
+  
+  --- Spillways are a multiset with identity empty
+  op empty : -> Spillways [ctor] . 
+  op __ : Spillways Spillways -> Spillways [ctor assoc comm id: empty] .
+
+  --- DamState is a quadruple [spillways, volume, timestamp, apertureCommand]
+  op `{_;_;_;_`} : Spillways Real Real Bool -> DamState .  
+ 
+  var S : SpillwayId .   var O : Aperture .   var SC : Spillways .
+  vars V V' X Y INFLOW : Real .   vars T T' DELTA : Real .
+   
+  --- We define several rules so that if the apertureCommand flag is true, the opening of a spillway changes
+  --- It can also happen (nocmd) that the configuration remains the same
+  rl [openC-1] : { [S, close] SC ; V ; T ; true } 
+              => { [S, open1] SC ; V ; T ; false } [narrowing] .
+
+  rl [open1-2] : { [S, open1] SC ; V ; T ; true } 
+              => { [S, open2] SC ; V ; T ; false } [narrowing] .
+
+  rl [open2-3] : { [S, open2] SC ; V ; T ; true } 
+              => { [S, open3] SC ; V ; T ; false } [narrowing] .
+
+  rl [close3-2] : { [S, open3] SC ; V ; T ; true } 
+               => { [S, open2] SC ; V ; T ; false } [narrowing] .
+
+  rl [close2-1] : { [S, open2] SC ; V ; T ; true } 
+               => { [S, open1] SC ; V ; T ; false } [narrowing] .
+
+  rl [close1-C] : { [S, open1] SC ; V ; T ; true } 
+               => { [S, close] SC ; V ; T ; false } [narrowing] .
+
+  rl [nocmd] :    { SC ; V ; T ; true } 
+               => { SC ; V ; T ; false } [narrowing] . 
+  
+  --- Spillway outflow depends on its opening position.
+  op aperture : Aperture ~> Real .
+  
+  eq aperture(close) = 0/1 [variant] .      --- with aperture close: no outflow
+  eq aperture(open1) = 200/1 [variant] .    --- with aperture open2: outflow constant rate 200 m3/min
+  eq aperture(open2) = 400/1 [variant] .    --- with aperture open2: outflow constant rate 400 m3/min
+  eq aperture(open3) = 1200/1 [variant] .   --- with aperture open2: outflow constant rate 800 m3/min
+  
+  --- Total outflow is the sum of the outflow of all the spillways
+  op outflow : Spillways ~> Real .
+    
+  rl [outflow-base] : outflow(empty) => 0/1 [narrowing] .
+  crl [outflow-recursive] : outflow([S,O] SC) => X + outflow(SC)
+                                                  if aperture(O) = X [nonexec] .	                                       
+  
+  --- The following rule models the volume variation in time interval [T,T+DELTA] 
+  --- depending on the outflow of the spillways and the inflow capacity
+ 
+  crl [volume] :  { SC ; V ; T ; false } => { SC ; V' ; T' ; true }  
+                                          if outflow(SC) => Y /\ (V' === ((V + INFLOW * DELTA) - (Y * DELTA)) and (T' === (T + DELTA))) = true [nonexec] .                                   
+endm

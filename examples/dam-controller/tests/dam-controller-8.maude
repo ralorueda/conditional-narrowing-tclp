@@ -1,0 +1,11 @@
+mod EXECUTE-EXAMPLE is
+  protecting NARROWING .
+  protecting DAM-CONTROLLER .
+endm
+
+reduce in EXECUTE-EXAMPLE :
+    narrowing(upModule('DAM-CONTROLLER, false), 
+    upTerm({ SWS:Spillways ; V:Real ; T:Real ; B:Bool }), 
+    '=>*, 
+    upTerm(St:DamState), 
+    false, false, false, false, empty, 'true.Boolean, unbounded, 8) .

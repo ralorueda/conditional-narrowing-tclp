@@ -1,0 +1,14 @@
+		     \||||||||||||||||||/
+		   --- Welcome to Maude ---
+		     /||||||||||||||||||\
+	     Maude 3.5 built: Sep 25 2024 12:00:00
+	     Copyright 1997-2024 SRI International
+		   Tue May  6 13:08:06 2025
+==========================================
+reduce in EXECUTE-EXAMPLE : narrowing(upModule('BANK-ACCOUNT, false), upTerm(<
+    bal: B:Natural pend: P:Natural overdraft: O:Bool > # M:MsgConf), '=>*,
+    upTerm(< bal: B':Natural pend: P':Natural overdraft: O':Bool > #
+    M':MsgConf), true, false, false, false, empty, empty, unbounded, 5) .
+rewrites: 680517 in 861ms cpu (861ms real) (790379 rewrites/second)
+result BenchmarkOutput: Solutions: 114
+Bye.

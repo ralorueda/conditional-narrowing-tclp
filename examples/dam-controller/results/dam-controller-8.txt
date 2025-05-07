@@ -1,0 +1,13 @@
+		     \||||||||||||||||||/
+		   --- Welcome to Maude ---
+		     /||||||||||||||||||\
+	     Maude 3.5 built: Apr 14 2025 13:22:25
+	     Copyright 1997-2024 SRI International
+		   Tue May  6 13:20:23 2025
+==========================================
+reduce in EXECUTE-EXAMPLE : narrowing(upModule('DAM-CONTROLLER, false), upTerm(
+    {SWS:Spillways ; V:Real ; T:Real ; B:Bool}), '=>*, upTerm(St:DamState),
+    false, false, false, false, empty, 'true.Boolean, unbounded, 8) .
+rewrites: 158600279 in 4530345ms cpu (4530344ms real) (35008 rewrites/second)
+result BenchmarkOutput: Solutions: 42457
+Bye.

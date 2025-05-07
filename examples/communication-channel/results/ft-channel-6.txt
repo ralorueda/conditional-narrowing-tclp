@@ -1,0 +1,14 @@
+		     \||||||||||||||||||/
+		   --- Welcome to Maude ---
+		     /||||||||||||||||||\
+	     Maude 3.5 built: Sep 25 2024 12:00:00
+	     Copyright 1997-2024 SRI International
+		   Tue May  6 13:20:06 2025
+==========================================
+reduce in EXECUTE-EXAMPLE : narrowing(upModule('FT-CHANNEL, false), upTerm([
+    NL:IntegerList, N:Integer]null[NL':IntegerList, N':Integer]), '=>*, upTerm(
+    C:Channel), true, false, false, false, empty, 'true.Boolean, unbounded, 6)
+    .
+rewrites: 79880798 in 2079127ms cpu (2079126ms real) (38420 rewrites/second)
+result BenchmarkOutput: Solutions: 19267
+Bye.

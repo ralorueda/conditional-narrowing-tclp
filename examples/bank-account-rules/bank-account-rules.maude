@@ -1,0 +1,64 @@
+***(
+Copyright 2021-2025 Universitat Politècnica de València, Spain
+
+This program is free software: you can redistribute it and/or modify it under the terms 
+of the GNU General Public License as published by the Free Software Foundation, either 
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+)***
+
+mod BANK-ACCOUNT is 
+    protecting TRUTH-VALUE .
+
+    sort Natural .
+    ops 0 1 : -> Natural [ctor] .
+    op _+_ : Natural Natural -> Natural [ctor assoc comm id: 0] .
+    op _+_ : [Natural] [Natural] -> [Natural] [assoc comm id: 0] .
+
+    vars n m : [Natural] .
+
+    op _>_ : [Natural] [Natural] -> [Bool] . 
+    op _<=_ : [Natural] [Natural] -> [Bool] .
+
+    rl [gt1] : m + n + 1 > n => true [narrowing] . 
+    rl [gt2] : n > n + m => false [narrowing] .
+
+    rl [lt1] : n <= m + n => true [narrowing] .
+    rl [lt2] : m + n + 1 <= n => false [narrowing] .
+
+    op _-_ : [Natural] [Natural] -> [Natural] .  *** monus
+    rl [monus] : (n + m) - n => m [narrowing] .
+
+    sorts Account Msg MsgConf State StatePair .
+    subsort  Msg < MsgConf .
+
+    op < bal:_pend:_overdraft:_> : Natural Natural Bool -> Account [ctor] . 
+    op mt : -> MsgConf [ctor] .
+    op withdraw : Natural -> Msg [ctor] .
+    op _,_ : MsgConf MsgConf -> MsgConf [ctor assoc comm id: mt] . 
+    op _#_ : Account MsgConf -> State [ctor] .  ***  state ctor
+
+    vars x x' y z z' : Natural .   var msgs : MsgConf .
+
+
+    *** requesting to draw money having sufficient funds; the amount
+    *** requested is added to the amount of pending withdraw requests
+    rl [w-req] : < bal: x + y + z pend: z overdraft: false > # msgs => 
+                    < bal: x + y + z pend: z + y overdraft: false > # withdraw(y),msgs [narrowing] .
+
+    *** more money can be deposited in the account if not in overdraft
+    rl [dep] :  < bal: x pend: z overdraft: false > # msgs =>
+                    < bal: x + y pend: z overdraft: false > # msgs [narrowing nonexec] .
+
+    *** actual withdrawing of money from account
+    crl [w1] :  < bal: x pend: z overdraft: false > # withdraw(y),msgs => 
+                    < bal: x pend: z overdraft: true > # msgs  
+                        if y > x => true .
+
+    *** actual withdrawing of money from account
+    crl [w2] :  < bal: x pend: z overdraft: false > # withdraw(y),msgs => 
+                    < bal: x' pend: z' overdraft: false > # msgs  
+                        if y <= x => true /\ (x - y) => x' /\ (z - y) => z' [nonexec] .    
+endm
